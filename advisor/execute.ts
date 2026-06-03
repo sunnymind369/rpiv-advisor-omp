@@ -24,7 +24,6 @@ import {
 	ERR_ADVISOR_IN_FLIGHT_DETAIL,
 	ERR_CALL_ABORTED,
 	ERR_EMPTY_RESPONSE,
-	ERR_EMPTY_RESPONSE_DETAIL,
 	ERR_NO_MODEL,
 	ERR_NO_MODEL_SELECTED,
 	errCallFailed,
@@ -33,6 +32,7 @@ import {
 	errCallThrew,
 	errMisconfigured,
 	errNoApiKey,
+	ADVISOR_TOOL_NAME,
 	errNoApiKeyDetail,
 	msgConsulting,
 } from "./messages.js";
@@ -93,8 +93,23 @@ function hashString(value: string): string {
 	return (hash >>> 0).toString(16);
 }
 
-function advisorContextFingerprint(leafId: string | null, branchMessages: Message[]): string {
-	return `${leafId ?? "root"}:${branchMessages.length}:${hashString(stableStringify(branchMessages))}`;
+
+function stripAdvisorMessagesForFingerprint(messages: Message[]): Message[] {
+	const filtered: Message[] = [];
+	for (const message of messages) {
+		if (message.role === "toolResult" && message.toolName === ADVISOR_TOOL_NAME) continue;
+		if (message.role === "assistant") {
+			const content = message.content.filter((part) => !(part.type === "toolCall" && part.name === ADVISOR_TOOL_NAME));
+			if (content.length > 0) filtered.push({ ...message, content });
+			continue;
+		}
+		filtered.push(message);
+	}
+	return filtered;
+}
+function advisorContextFingerprint(leafId: string | null, sentMessages: Message[]): string {
+	const canonicalMessages = stripAdvisorMessagesForFingerprint(sentMessages);
+	return `${leafId ?? "root"}:${canonicalMessages.length}:${hashString(stableStringify(canonicalMessages))}`;
 }
 
 export async function executeAdvisor(
@@ -136,7 +151,7 @@ export async function executeAdvisor(
 	const messages: Message[] = inventoryMessage ? [inventoryMessage, ...branchMessages] : branchMessages;
 
 	const sessionKey = advisorSessionKey(ctx);
-	const contextFingerprint = advisorContextFingerprint(ctx.sessionManager.getLeafId(), branchMessages);
+	const contextFingerprint = advisorContextFingerprint(ctx.sessionManager.getLeafId(), messages);
 	if (advisorInFlightSessions.has(sessionKey)) {
 		return buildErrorResult(advisorLabel, effort, errAdvisorInFlight(), ERR_ADVISOR_IN_FLIGHT_DETAIL);
 	}

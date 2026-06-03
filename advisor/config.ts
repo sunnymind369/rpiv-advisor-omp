@@ -4,7 +4,7 @@
  * and the modelKey (join) / parseModelKey (split) inverse pair (L4-04).
  */
 
-import type { ThinkingLevel } from "@earendil-works/pi-ai";
+import type { Api, Model, ThinkingLevel } from "@earendil-works/pi-ai";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { type GuidanceFields, loadJsonConfig, saveJsonConfig } from "./config-io.js";
@@ -25,6 +25,14 @@ export function loadAdvisorConfig(): AdvisorConfig {
 	return loadJsonConfig<AdvisorConfig>(ADVISOR_CONFIG_PATH);
 }
 
+
+export function validateAdvisorEffort(value: unknown): ThinkingLevel | undefined {
+	return EFFORT_ORDINAL.includes(value as ThinkingLevel) ? (value as ThinkingLevel) : undefined;
+}
+
+export function isAdvisorEffortSupported(model: Model<Api>, effort: ThinkingLevel): boolean {
+	return model.thinkingLevelMap?.[effort] !== null;
+}
 export function validateDisabledForModels(value: unknown): DisabledForModelsEntry[] {
 	if (!Array.isArray(value)) return [];
 	return value.filter((entry): entry is DisabledForModelsEntry => {

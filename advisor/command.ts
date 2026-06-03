@@ -9,9 +9,10 @@ import type { Api, Model, ThinkingLevel } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { SelectItem } from "@earendil-works/pi-tui";
 import { showAdvisorPicker, showEffortPicker } from "../advisor-ui.js";
-import { modelKey, saveAdvisorConfig } from "./config.js";
+import { isAdvisorEffortSupported, modelKey, saveAdvisorConfig } from "./config.js";
 import { reconcileAdvisorTool } from "./handlers.js";
 import {
+	ADVISOR_TOOL_NAME,
 	BASE_EFFORT_LEVELS,
 	CHECKMARK,
 	DEFAULT_EFFORT,
@@ -29,9 +30,6 @@ import {
 import { isExecutorBlocked } from "./policy.js";
 import { getAdvisorEffort, getAdvisorModel, setAdvisorEffort, setAdvisorModel } from "./state.js";
 
-function effortSupported(model: Model<Api>, level: ThinkingLevel): boolean {
-	return model.thinkingLevelMap?.[level] !== null;
-}
 
 function buildModelItems(availableModels: Model<Api>[], currentKey: string | undefined): SelectItem[] {
 	const items: SelectItem[] = availableModels.map((m) => {
@@ -47,7 +45,7 @@ function buildModelItems(availableModels: Model<Api>[], currentKey: string | und
 }
 
 function buildEffortItems(picked: Model<Api>): SelectItem[] {
-	const levels = [...BASE_EFFORT_LEVELS, XHIGH_EFFORT_LEVEL].filter((level) => effortSupported(picked, level));
+	const levels = [...BASE_EFFORT_LEVELS, XHIGH_EFFORT_LEVEL].filter((level) => isAdvisorEffortSupported(picked, level));
 	return [
 		{ value: OFF_VALUE, label: "off" },
 		...levels.map((level) => ({

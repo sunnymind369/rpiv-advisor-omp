@@ -6,10 +6,16 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { loadAdvisorConfig, parseModelKey, validateDisabledForModels } from "./config.js";
+import {
+	isAdvisorEffortSupported,
+	loadAdvisorConfig,
+	parseModelKey,
+	validateAdvisorEffort,
+	validateDisabledForModels,
+} from "./config.js";
 import { ADVISOR_TOOL_NAME, errModelUnavailable, msgAdvisorRestored, msgAdvisorRestoredInactive } from "./messages.js";
 import { isExecutorBlocked, setDisabledForModels } from "./policy.js";
-import { setAdvisorEffort, setAdvisorModel } from "./state.js";
+import { getAdvisorEffort, setAdvisorEffort, setAdvisorModel } from "./state.js";
 
 /**
  * Module-local notification de-dupe. Pi fires `session_start` for every session
@@ -57,14 +63,14 @@ export async function restoreAdvisorState(ctx: ExtensionContext, pi: ExtensionAP
 		return;
 	}
 
-	setAdvisorModel(model);
-	if (config.effort) {
-		setAdvisorEffort(config.effort);
+	const effort = validateAdvisorEffort(config.effort);
+	if (effort && isAdvisorEffortSupported(model, effort)) {
+		setAdvisorEffort(effort);
 	}
+	const advisorLabel = `${model.provider}:${model.id}`;
 
 	if (isExecutorBlocked(ctx, pi.getThinkingLevel())) {
-		const advisorLabel = `${model.provider}:${model.id}`;
-		notifyOnce(msgAdvisorRestoredInactive(advisorLabel, config.effort), "info");
+		notifyOnce(msgAdvisorRestoredInactive(advisorLabel, getAdvisorEffort()), "info");
 		return;
 	}
 
@@ -72,8 +78,7 @@ export async function restoreAdvisorState(ctx: ExtensionContext, pi: ExtensionAP
 	if (!active.includes(ADVISOR_TOOL_NAME)) {
 		await pi.setActiveTools([...active, ADVISOR_TOOL_NAME]);
 	}
-
-	notifyOnce(msgAdvisorRestored(`${model.provider}:${model.id}`, config.effort), "info");
+	notifyOnce(msgAdvisorRestored(advisorLabel, getAdvisorEffort()), "info");
 }
 
 export function registerAdvisorSessionStart(pi: ExtensionAPI): void {
