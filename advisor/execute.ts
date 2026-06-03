@@ -24,6 +24,7 @@ import {
 	ERR_ADVISOR_IN_FLIGHT_DETAIL,
 	ERR_CALL_ABORTED,
 	ERR_EMPTY_RESPONSE,
+	ERR_EMPTY_RESPONSE_DETAIL,
 	ERR_NO_MODEL,
 	ERR_NO_MODEL_SELECTED,
 	errCallFailed,
@@ -93,23 +94,23 @@ function hashString(value: string): string {
 	return (hash >>> 0).toString(16);
 }
 
-
-function stripAdvisorMessagesForFingerprint(messages: Message[]): Message[] {
-	const filtered: Message[] = [];
+function canonicalizeMessagesForFingerprint(messages: Message[]): unknown[] {
+	const canonicalMessages: unknown[] = [];
 	for (const message of messages) {
 		if (message.role === "toolResult" && message.toolName === ADVISOR_TOOL_NAME) continue;
 		if (message.role === "assistant") {
-			const content = message.content.filter((part) => !(part.type === "toolCall" && part.name === ADVISOR_TOOL_NAME));
-			if (content.length > 0) filtered.push({ ...message, content });
+			if (message.content.some((part) => part.type === "toolCall" && part.name === ADVISOR_TOOL_NAME)) continue;
+			canonicalMessages.push({ ...message, timestamp: undefined });
 			continue;
 		}
-		filtered.push(message);
+		canonicalMessages.push({ ...message, timestamp: undefined });
 	}
-	return filtered;
+	return canonicalMessages;
 }
-function advisorContextFingerprint(leafId: string | null, sentMessages: Message[]): string {
-	const canonicalMessages = stripAdvisorMessagesForFingerprint(sentMessages);
-	return `${leafId ?? "root"}:${canonicalMessages.length}:${hashString(stableStringify(canonicalMessages))}`;
+
+function advisorContextFingerprint(sentMessages: Message[]): string {
+	const canonicalMessages = canonicalizeMessagesForFingerprint(sentMessages);
+	return `${canonicalMessages.length}:${hashString(stableStringify(canonicalMessages))}`;
 }
 
 export async function executeAdvisor(
@@ -151,7 +152,7 @@ export async function executeAdvisor(
 	const messages: Message[] = inventoryMessage ? [inventoryMessage, ...branchMessages] : branchMessages;
 
 	const sessionKey = advisorSessionKey(ctx);
-	const contextFingerprint = advisorContextFingerprint(ctx.sessionManager.getLeafId(), messages);
+	const contextFingerprint = advisorContextFingerprint(messages);
 	if (advisorInFlightSessions.has(sessionKey)) {
 		return buildErrorResult(advisorLabel, effort, errAdvisorInFlight(), ERR_ADVISOR_IN_FLIGHT_DETAIL);
 	}

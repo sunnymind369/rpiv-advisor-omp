@@ -63,6 +63,8 @@ export async function restoreAdvisorState(ctx: ExtensionContext, pi: ExtensionAP
 		return;
 	}
 
+	setAdvisorModel(model);
+
 	const effort = validateAdvisorEffort(config.effort);
 	if (effort && isAdvisorEffortSupported(model, effort)) {
 		setAdvisorEffort(effort);

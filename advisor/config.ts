@@ -31,7 +31,10 @@ export function validateAdvisorEffort(value: unknown): ThinkingLevel | undefined
 }
 
 export function isAdvisorEffortSupported(model: Model<Api>, effort: ThinkingLevel): boolean {
-	return model.thinkingLevelMap?.[effort] !== null;
+	const mapped = model.thinkingLevelMap?.[effort];
+	if (mapped === null) return false;
+	if (effort === "xhigh") return mapped !== undefined;
+	return true;
 }
 export function validateDisabledForModels(value: unknown): DisabledForModelsEntry[] {
 	if (!Array.isArray(value)) return [];
